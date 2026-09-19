@@ -5,21 +5,33 @@
 </p>
 
 <p align="center">
-  <sub>Python 3.12+ · Google Images · resumable · resolution-filtered</sub>
+  <sub>v.0.0.1 · Python 3.12+ · Google Images · resumable · resolution-filtered</sub>
 </p>
 
 ---
 
 ## Quickstart
 
+1. Clone the repository
+
+```bash
+git clone https://github.com/Leckrosh/the-image-scrapper.git
+cd the-image-scrapper
+```
+
+2. Prepare Python Environment
 ```bash
 python -m venv venv
-venv\Scripts\Activate.ps1          # PowerShell   (cmd: venv\Scripts\activate.bat)
+venv\Scripts\Activate.ps1
 pip install -e .
-playwright install chromium        # one-time browser download
+playwright install chromium
+```
 
+3. Start downloading Images
+```bash
 tis "Ferrari Italia" --count 20 --min-resolution 1080p --headful
 ```
+
 
 Kept images land in `images/ferrari_italia/ferrari_italia_0001.jpg`, `…_0002.jpg`, … — one folder per search term.
 
@@ -194,11 +206,10 @@ stores cookies/session data and is git-ignored.
 
 ## Roadmap
 
-- **More sources.** A server-rendered source like **Bing Images** is GET-scrapable — no
-  rendering browser needed. Because it's plain HTTP, the harvest could run fully **async**
-  (fetching result pages concurrently), unlike the inherently serial Google browser flow.
-- **Smarter output naming.** The current one-folder-per-term layout works, but there's
-  room for a more optimal scheme — **proposals welcome.**
+- [ ] Add Bing Images support.
+- [ ] Add MCP Server.
+- [ ] Include UI.
+- [ ] Smarter output naming (Proposals welcome)
 
 ---
 
