@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual env
+venv/
+.venv/
+
+# imagegrab runtime output
+images/
+*.db
+*.sqlite
+*.sqlite3
+
+# Persistent browser profile (--profile-dir); never commit cookies/session data
+chrome-profile/
+*-profile/
+.gprofile/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
