@@ -19,7 +19,8 @@ dependencies = [
 ]
 
 [project.scripts]
-imagegrab = "imagegrab.cli:main"
+tis = "imagegrab.cli:main"
+imagegrab = "imagegrab.cli:main"  # backwards-compatible alias
 
 [tool.setuptools.packages.find]
 where = ["src"]

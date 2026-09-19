@@ -12,7 +12,7 @@ COUNT_CEILING = 1000
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="imagegrab",
+        prog="tis",
         description=(
             "Type a search term, get N de-duplicated images of at least a "
             "chosen resolution into a folder."
@@ -73,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=1.0,
         help="Seconds to wait between thumbnail clicks while harvesting (default: 1.0).",
     )
-    parser.add_argument("--version", action="version", version=f"imagegrab {__version__}")
+    parser.add_argument("--version", action="version", version=f"tis {__version__}")
     return parser
 
 
