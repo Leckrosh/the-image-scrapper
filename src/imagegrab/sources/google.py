@@ -26,13 +26,9 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from ..models import ImageResult
-from .base import ImageSource
+from .base import USER_AGENT, ImageSource
 
-# For experience, USER Agent is recommended to be set no matter what kind of Image browser you are using.
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-)
+__all__ = ["GoogleImagesSource", "USER_AGENT"]
 
 # Please, if you need more timeout modify it here.
 SOLVE_TIMEOUT_MS = 180_000

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "imagegrab"
-version = "0.1.0"
+version = "0.0.2"
 description = "Scraper-first tool: type a search term, get N de-duplicated images at a chosen resolution."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,7 @@ authors = [{ name = "Israel" }]
 dependencies = [
     "playwright>=1.40",
     "httpx>=0.27",
+    "selectolax>=0.3",
     "SQLAlchemy>=2.0",
     "pillow>=10.0",
     "imagehash>=4.3",

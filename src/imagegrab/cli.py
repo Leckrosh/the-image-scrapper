@@ -6,6 +6,7 @@ import sys
 from . import __version__
 from .pipeline import run
 from .resolution import TIERS
+from .sources import DEFAULT_SOURCE, SOURCES
 
 COUNT_CEILING = 1000
 
@@ -35,6 +36,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Minimum shorter-side resolution tier (default: none).",
     )
     parser.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default=DEFAULT_SOURCE,
+        help=(
+            f"Harvest source (default: {DEFAULT_SOURCE}). 'bing' is hands-off "
+            "(headless browser, no CAPTCHA, no manual step). 'google' is richer "
+            "but fragile and may need --headful to solve a CAPTCHA by hand."
+        ),
+    )
+    parser.add_argument(
         "--out",
         default="images",
         help=(
@@ -50,15 +61,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--headful",
         action="store_true",
-        help="Show the browser while harvesting (required to solve a CAPTCHA by hand).",
+        help=(
+            "Show the browser while harvesting. Required for Google to solve a "
+            "CAPTCHA by hand; for Bing it's optional (just to watch/debug)."
+        ),
     )
     parser.add_argument(
         "--profile-dir",
         default=None,
         help=(
-            "Persistent browser profile directory. Remembers consent + CAPTCHA "
-            "solves across runs - recommended with --headful for Google. Use a "
-            "dedicated folder, not your everyday Chrome profile."
+            "Google only: persistent browser profile directory. Remembers consent "
+            "+ CAPTCHA solves across runs - recommended with --headful. Use a "
+            "dedicated folder, not your everyday Chrome profile. Ignored by "
+            "--source bing."
         ),
     )
     parser.add_argument(
@@ -71,7 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--pace",
         type=float,
         default=1.0,
-        help="Seconds to wait between thumbnail clicks while harvesting (default: 1.0).",
+        help=(
+            "Seconds to wait between actions while harvesting - thumbnail hovers "
+            "on Google, scrolls on Bing (default: 1.0)."
+        ),
     )
     parser.add_argument("--version", action="version", version=f"tis {__version__}")
     return parser
@@ -98,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         min_resolution=args.min_resolution,
         out_dir=args.out,
         db_path=args.db,
+        source=args.source,
         headful=args.headful,
         concurrency=args.concurrency,
         pace=args.pace,
