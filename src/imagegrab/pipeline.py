@@ -1,11 +1,13 @@
 """Orchestration: harvest -> download/filter until enough images are kept.
 
-The pipeline is fully synchronous for now, at least because of the requirements for getting images
-from google images.
+The pipeline is source-agnostic: it drives whatever ``ImageSource`` the registry
+builds (Bing by default, Google via ``--source google``). It stays fully
+synchronous - Bing is a plain HTTP loop, and Google's sync Playwright API also
+requires it.
 
 Stopping conditions:
     * ``count`` images kept (the target), or
-    * Google is exhausted (harvest yields no more), or
+    * the source is exhausted (harvest yields no more), or
     * the hard per-search harvest ceiling is hit.
 """
 
@@ -15,7 +17,7 @@ from collections.abc import Callable
 
 from .downloader import Downloader
 from .resolution import TIERS
-from .sources.google import GoogleImagesSource
+from .sources import DEFAULT_SOURCE, build_source
 from .store import Store
 
 HARVEST_CEILING = 1000
@@ -28,6 +30,7 @@ def run(
     min_resolution: str = "none",
     out_dir: str = "images",
     db_path: str = "imagegrab.db",
+    source: str = DEFAULT_SOURCE,
     headful: bool = False,
     concurrency: int = 20,
     pace: float = 1.0,
@@ -53,11 +56,13 @@ def run(
         progress(f"[imagegrab] target already met ({kept}/{count}).")
         return _summary(store, query, kept, count, progress)
 
-    source = GoogleImagesSource(headful=headful, pace=pace, profile_dir=profile_dir)
+    harvester = build_source(
+        source, headful=headful, pace=pace, profile_dir=profile_dir
+    )
     harvested = 0
     batch = []
 
-    for result in source.search(query, limit=HARVEST_CEILING):
+    for result in harvester.search(query, limit=HARVEST_CEILING):
         harvested += 1
         row = store.add_candidate(result)
         if row is not None:
