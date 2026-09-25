@@ -1,4 +1,6 @@
-"""Downloading + filtering — no browser involved.
+"""
+
+Downloading + filtering — no browser involved.
 
 Once a full-res origin URL is harvested, fetching it is a plain HTTP GET. This
 module fetches a batch of pending rows concurrently (network is the
@@ -27,7 +29,7 @@ from PIL import Image, UnidentifiedImageError
 from .dedup import sha256_bytes
 from .naming import image_filename, slugify
 from .resolution import passes
-from .sources.google import USER_AGENT
+from .sources.base import USER_AGENT
 from .store import Store
 
 _EXT_BY_FORMAT = {
@@ -88,7 +90,8 @@ class Downloader:
 
     async def _fetch_all(self, rows):
         semaphore = asyncio.Semaphore(self.concurrency)
-        headers = {"User-Agent": USER_AGENT, "Referer": "https://www.google.com/"}
+
+        headers = {"User-Agent": USER_AGENT}
         async with httpx.AsyncClient(
             headers=headers, timeout=self.timeout, follow_redirects=True
         ) as client:
