@@ -41,8 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SOURCE,
         help=(
             f"Harvest source (default: {DEFAULT_SOURCE}). 'bing' is hands-off "
-            "(headless browser, no CAPTCHA, no manual step). 'google' is richer "
-            "but fragile and may need --headful to solve a CAPTCHA by hand."
+            "(headless browser, no CAPTCHA, no manual step). 'yandex' is also "
+            "headless; if it ever asks for a CAPTCHA, re-run with --headful to "
+            "solve it. 'google' is richer but fragile and may need --headful to "
+            "solve a CAPTCHA by hand."
         ),
     )
     parser.add_argument(
@@ -63,7 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Show the browser while harvesting. Required for Google to solve a "
-            "CAPTCHA by hand; for Bing it's optional (just to watch/debug)."
+            "CAPTCHA by hand; on Yandex it pauses for you to solve one only if it "
+            "shows up; for Bing it's optional (just to watch/debug)."
         ),
     )
     parser.add_argument(
@@ -73,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Google only: persistent browser profile directory. Remembers consent "
             "+ CAPTCHA solves across runs - recommended with --headful. Use a "
             "dedicated folder, not your everyday Chrome profile. Ignored by "
-            "--source bing."
+            "--source bing and --source yandex."
         ),
     )
     parser.add_argument(
@@ -88,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=1.0,
         help=(
             "Seconds to wait between actions while harvesting - thumbnail hovers "
-            "on Google, scrolls on Bing (default: 1.0)."
+            "on Google, scrolls on Bing, result pages on Yandex (default: 1.0)."
         ),
     )
     parser.add_argument("--version", action="version", version=f"tis {__version__}")
