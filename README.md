@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <sub>v.0.0.2 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
+  <sub>v.0.0.3 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
 </p>
 
 ---

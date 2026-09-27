@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "imagegrab"
-version = "0.0.2"
+version = "0.0.3"
 description = "Scraper-first tool: type a search term, get N de-duplicated images at a chosen resolution."
 readme = "README.md"
 requires-python = ">=3.12"
