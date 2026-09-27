@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import asyncio
 import io
+import ssl
 import threading
 from pathlib import Path
 
 import httpx
 import imagehash
+import truststore
 from PIL import Image, UnidentifiedImageError
 
 from .dedup import sha256_bytes
@@ -91,9 +93,16 @@ class Downloader:
     async def _fetch_all(self, rows):
         semaphore = asyncio.Semaphore(self.concurrency)
 
+        #During testing I found that sometimes my AV blocks the automated download here, that's why I added 
+        # truststore, to have a certificate. If you have problems downloading the harvested url's, modifying this
+        # can help.
         headers = {"User-Agent": USER_AGENT}
+        ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         async with httpx.AsyncClient(
-            headers=headers, timeout=self.timeout, follow_redirects=True
+            headers=headers,
+            timeout=self.timeout,
+            follow_redirects=True,
+            verify=ssl_context,
         ) as client:
             tasks = [
                 self._fetch_one(client, semaphore, row.id, row.query, row.image_url)
