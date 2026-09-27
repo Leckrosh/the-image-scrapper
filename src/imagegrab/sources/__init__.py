@@ -3,12 +3,14 @@ from __future__ import annotations
 from .base import ImageSource
 from .bing import BingImagesSource
 from .google import GoogleImagesSource
+from .yahoo import YahooImagesSource
 from .yandex import YandexImagesSource
 
 SOURCES: dict[str, type[ImageSource]] = {
     "bing": BingImagesSource,
     "google": GoogleImagesSource,
     "yandex": YandexImagesSource,
+    "yahoo": YahooImagesSource,
 }
 
 # Bing is selected as default only because is the 1st solution that works headless with no more human intervention
@@ -31,4 +33,6 @@ def build_source(
         return BingImagesSource(headful=headful, pace=pace)
     if name == "yandex":
         return YandexImagesSource(headful=headful, pace=pace)
+    if name == "yahoo":
+        return YahooImagesSource(headful=headful, pace=pace)
     raise ValueError(f"unknown source: {name!r} (choices: {', '.join(SOURCES)})")
