@@ -1,16 +1,3 @@
-"""Orchestration: harvest -> download/filter until enough images are kept.
-
-The pipeline is source-agnostic: it drives whatever ``ImageSource`` the registry
-builds (Bing by default, Google via ``--source google``). It stays fully
-synchronous - Bing is a plain HTTP loop, and Google's sync Playwright API also
-requires it.
-
-Stopping conditions:
-    * ``count`` images kept (the target), or
-    * the source is exhausted (harvest yields no more), or
-    * the hard per-search harvest ceiling is hit.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
