@@ -10,7 +10,6 @@ from .sources import DEFAULT_SOURCE, SOURCES
 
 COUNT_CEILING = 1000
 
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tis",
@@ -41,8 +40,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SOURCE,
         help=(
             f"Harvest source (default: {DEFAULT_SOURCE}). 'bing' is hands-off "
-            "(headless browser, no CAPTCHA, no manual step). 'google' is richer "
-            "but fragile and may need --headful to solve a CAPTCHA by hand."
+            "(headless browser, no CAPTCHA, no manual step). 'yandex' is also "
+            "headless; if it ever asks for a CAPTCHA, re-run with --headful to "
+            "solve it. 'yahoo' is headless too (a few hundred images per term at "
+            "most). 'brave' is headless too and has its own index, so its images "
+            "barely overlap with the others (at most ~200 per term). 'duckduckgo' "
+            "only works with --headful (it refuses headless browsers); no manual "
+            "step after that, a few hundred images per term. 'google' is "
+            "richer but fragile and may need --headful to solve a CAPTCHA by hand."
         ),
     )
     parser.add_argument(
@@ -63,7 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Show the browser while harvesting. Required for Google to solve a "
-            "CAPTCHA by hand; for Bing it's optional (just to watch/debug)."
+            "CAPTCHA by hand; on Yandex it pauses for you to solve one only if it "
+            "shows up; on Yahoo it pauses only if you're sent to a consent page; "
+            "on Brave it pauses only if a CAPTCHA shows up; required for "
+            "DuckDuckGo, which refuses headless browsers; "
+            "for Bing it's optional (just to watch/debug)."
         ),
     )
     parser.add_argument(
@@ -73,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Google only: persistent browser profile directory. Remembers consent "
             "+ CAPTCHA solves across runs - recommended with --headful. Use a "
             "dedicated folder, not your everyday Chrome profile. Ignored by "
-            "--source bing."
+            "--source bing, yandex, yahoo, brave and duckduckgo."
         ),
     )
     parser.add_argument(
@@ -88,7 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=1.0,
         help=(
             "Seconds to wait between actions while harvesting - thumbnail hovers "
-            "on Google, scrolls on Bing (default: 1.0)."
+            "on Google, scrolls on Bing and DuckDuckGo, result pages on Yandex and "
+            "Yahoo; unused on Brave, which loads a single page per term "
+            "(default: 1.0)."
         ),
     )
     parser.add_argument("--version", action="version", version=f"tis {__version__}")

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <sub>v.0.0.2 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
+  <sub>v.0.0.3 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
 </p>
 
 ---
@@ -83,8 +83,14 @@ one with `--source` (default: `bing`).
 | ------------- | ---------------------- | ------------------------------------------------------------ |
 | Bing Images   | ✅ Supported (default) | Headless browser — hands-off: no CAPTCHA, no manual step.    |
 | Google Images | ✅ Supported           | Real browser; may hit a CAPTCHA you solve by hand (`--headful`). |
+| Brave Images | ✅ Supported           | Headless browser, no CAPTCHA & no manual step. |
+| Yahoo Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
+| Yandex Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
+| DuckDuckGo Images | ✅ Supported           | Real browser but no CAPTCHA need to be solved. (`--headful`). |
 
-> Both sources drive a browser, but they're not equal. **Bing runs headless and
+> All sources drive a browser, but they're not equal.
+> </br> e.g. 
+> </br> **Bing runs headless and
 > unattended** — no CAPTCHA, no manual step — so it's the default. Google is
 > powerful but the "one fragile source": it can serve a CAPTCHA and its markup
 > changes over time. Reach for `--source google` when you specifically want
@@ -247,6 +253,13 @@ stores cookies/session data and is git-ignored.
 ## Roadmap
 
 - [x] Add Bing Images support.
+- [x] Brave Images support.
+- [x] Yahoo Images support.
+- [x] Yandex Images support.
+- [x] DuckDuckGo support.
+- [x] Google Images support.
+- [ ] Qwant Images support.
+- [ ] Baidu Images support.
 - [ ] Multi-source / mixed harvesting (combine Bing + Google in one run).
 - [ ] Add MCP Server.
 - [ ] Include UI.
@@ -260,9 +273,8 @@ stores cookies/session data and is git-ignored.
   you use them.
 - **Datacenter IPs** may be blocked automatically, which can make TIS unusable from such
   hosts; a residential connection (with `--headful` + `--profile-dir`) is more reliable.
-- **Google markup is a moving target.** If harvesting suddenly returns nothing, Google has
-  likely reshuffled its markup — run with `--headful` to watch, and update the selectors in
-  `src/imagegrab/sources/google.py` (they're isolated in one clearly marked block).
+- **Most of the sources markup tend to be moving targets.** If harvesting suddenly returns nothing in any of the sources, its that the source reshuffled its markup — run with `--headful` to watch, and update the selectors in
+  `src/imagegrab/sources/{browser_source}.py` (they're isolated in one clearly marked block).
 
 ---
 
