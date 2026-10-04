@@ -8,7 +8,7 @@ from .pipeline import run
 from .resolution import TIERS
 from .sources import DEFAULT_SOURCE, SOURCES
 
-COUNT_CEILING = 1000
+COLLECT_CEILING = 1000
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -20,12 +20,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("query", help="Search term, e.g. \"Ferrari Italia\".")
     parser.add_argument(
-        "--count",
+        "--collect",
         type=int,
         default=50,
         help=(
-            "Number of images to KEEP after dedup + resolution filtering "
-            f"(default: 50; clamped to 1..{COUNT_CEILING})."
+            "Number of NEW images to keep this run (after dedup + resolution "
+            "filtering), on top of what is already stored for the term "
+            f"(default: 50; clamped to 1..{COLLECT_CEILING})."
+        ),
+    )
+    parser.add_argument(
+        "--max-total",
+        type=int,
+        default=None,
+        help=(
+            "Never let the term's folder go past this many images in total, "
+            "whatever --collect says. Applies to this run only (not saved)."
         ),
     )
     parser.add_argument(
@@ -48,6 +58,15 @@ def build_parser() -> argparse.ArgumentParser:
             "only works with --headful (it refuses headless browsers); no manual "
             "step after that, a few hundred images per term. 'google' is "
             "richer but fragile and may need --headful to solve a CAPTCHA by hand."
+        ),
+    )
+    parser.add_argument(
+        "--unique-source",
+        action="store_true",
+        help=(
+            "Use only the chosen --source. By default, leftover URLs found earlier "
+            "by ANY source are downloaded first; with this flag, leftovers from "
+            "other sources are skipped (this source's own are still used)."
         ),
     )
     parser.add_argument(
@@ -107,23 +126,29 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
-    count = args.count
-    if count < 1:
-        print("[imagegrab] --count below 1; clamping to 1.", file=sys.stderr)
-        count = 1
-    elif count > COUNT_CEILING:
+    collect = args.collect
+    if collect < 1:
+        print("[tis] --collect below 1; clamping to 1.", file=sys.stderr)
+        collect = 1
+    elif collect > COLLECT_CEILING:
         print(
-            f"[imagegrab] --count {count} exceeds the {COUNT_CEILING} ceiling; "
-            f"clamping to {COUNT_CEILING}.",
+            f"[tis] --collect {collect} exceeds the {COLLECT_CEILING} ceiling; "
+            f"clamping to {COLLECT_CEILING}.",
             file=sys.stderr,
         )
-        count = COUNT_CEILING
+        collect = COLLECT_CEILING
+
+    if args.max_total is not None and args.max_total < 1:
+        parser.error("--max-total must be at least 1")
 
     run(
         query=args.query,
-        count=count,
+        collect=collect,
+        max_total=args.max_total,
+        unique_source=args.unique_source,
         min_resolution=args.min_resolution,
         out_dir=args.out,
         db_path=args.db,

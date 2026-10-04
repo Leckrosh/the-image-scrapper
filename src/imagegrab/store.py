@@ -65,10 +65,33 @@ class Store:
             return None
         return row
 
-    def pending(self, query: str | None = None) -> list[ImageRow]:
+    def pending(
+        self, query: str | None = None, source: str | None = None
+    ) -> list[ImageRow]:
         stmt = select(ImageRow).where(ImageRow.status == "pending")
         if query is not None:
             stmt = stmt.where(ImageRow.query == query)
+        if source is not None:
+            stmt = stmt.where(ImageRow.source == source)
+        return list(self.session.scalars(stmt))
+
+    # Rows rejected as too small that would pass a (lower) tier now. Only
+    # too_small rows are trusted here: their width/height were measured on the
+    # decoded image, while a pending row only carries what the source claimed.
+    # w >= tier and h >= tier is the same as min(w, h) >= tier (resolution.passes).
+    def reusable(
+        self, query: str, tier: int, source: str | None = None
+    ) -> list[ImageRow]:
+        stmt = select(ImageRow).where(
+            ImageRow.query == query,
+            ImageRow.status == "too_small",
+            ImageRow.width.is_not(None),
+            ImageRow.height.is_not(None),
+            ImageRow.width >= tier,
+            ImageRow.height >= tier,
+        )
+        if source is not None:
+            stmt = stmt.where(ImageRow.source == source)
         return list(self.session.scalars(stmt))
 
     def byte_hash_exists(self, byte_hash: str) -> bool:
