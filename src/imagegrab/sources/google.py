@@ -82,7 +82,7 @@ def _is_origin(url: str | None) -> bool:
 
 
 def _log(message: str) -> None:
-    print(f"[imagegrab] {message}", file=sys.stderr)
+    print(f"[tis] {message}", file=sys.stderr)
 
 
 class GoogleImagesSource(ImageSource):

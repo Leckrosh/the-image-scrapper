@@ -63,7 +63,7 @@ _IGNORE_DEFAULT_ARGS = ["--enable-automation"]
 
 
 def _log(message: str) -> None:
-    print(f"[imagegrab] {message}", file=sys.stderr)
+    print(f"[tis] {message}", file=sys.stderr)
 
 
 class YahooImagesSource(ImageSource):

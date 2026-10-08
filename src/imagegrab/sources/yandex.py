@@ -64,7 +64,7 @@ _IGNORE_DEFAULT_ARGS = ["--enable-automation"]
 
 
 def _log(message: str) -> None:
-    print(f"[imagegrab] {message}", file=sys.stderr)
+    print(f"[tis] {message}", file=sys.stderr)
 
 
 def _absolute(url: str | None) -> str | None:
