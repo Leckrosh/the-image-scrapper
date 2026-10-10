@@ -33,11 +33,11 @@ tis "Ferrari Italia" --collect 20 --min-resolution 1080p
 ```
 
 That uses the default **Bing** source — no browser window, no CAPTCHA. To use
-Google instead, add `--source google` (and `--headful` so you can solve a CAPTCHA
-by hand):
+Google instead, add `--source google`. It always opens a browser window, so you can
+solve a CAPTCHA by hand (no `--headful` needed):
 
 ```bash
-tis "Ferrari Italia" --collect 20 --min-resolution 1080p --source google --headful
+tis "Ferrari Italia" --collect 20 --min-resolution 1080p --source google
 ```
 
 Kept images land in `images/ferrari_italia/ferrari_italia_0001.jpg`, `…_0002.jpg`, … — one folder per search term.
@@ -83,11 +83,11 @@ one with `--source` (default: `bing`).
 | Source        | Status                 | Notes                                                        |
 | ------------- | ---------------------- | ------------------------------------------------------------ |
 | Bing Images   | ✅ Supported (default) | Headless browser — hands-off: no CAPTCHA, no manual step.    |
-| Google Images | ✅ Supported           | Real browser; may hit a CAPTCHA you solve by hand (`--headful`). |
+| Google Images | ✅ Supported           | Always headful; may hit a CAPTCHA you solve by hand. Not harvested with `--unattended`. |
 | Brave Images | ✅ Supported           | Headless browser, no CAPTCHA & no manual step. |
 | Yahoo Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
 | Yandex Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
-| DuckDuckGo Images | ✅ Supported           | Real browser but no CAPTCHA need to be solved. (`--headful`). |
+| DuckDuckGo Images | ✅ Supported           | Always headful (it refuses headless browsers), but no CAPTCHA to solve. |
 
 > All sources drive a browser, but they're not equal.
 > </br> e.g. 
@@ -140,7 +140,8 @@ tis "Ferrari Italia" --collect 20 --min-resolution 1080p
 | `--unique-source`  | off            | Use only `--source`: skip leftover URLs found by other sources.  |
 | `--out`            | `images`       | Root output folder for kept images.                              |
 | `--db`             | `imagegrab.db` | SQLite manifest path.                                            |
-| `--headful`        | off            | Show the browser. On Google, required to solve a CAPTCHA by hand; on Bing, just to watch/debug. |
+| `--headful`        | per source     | Show the browser for sources that run headless by default (Bing, Yandex, Yahoo, Brave) — to watch/debug or solve a CAPTCHA by hand. Google and DuckDuckGo always run headful. |
+| `--unattended`     | off            | Nobody at the keyboard: never wait for a person. A CAPTCHA stops the run (exit code `3`); Google isn't harvested. See [Unattended runs](#unattended-runs). |
 | `--profile-dir`    | none           | **Google only:** persistent profile — remembers consent + CAPTCHA solves. |
 | `--concurrency`    | `20`           | Max simultaneous downloads.                                      |
 | `--pace`           | `1.0`          | Seconds between scrolls while harvesting (thumbnail hovers on Google). |
@@ -257,16 +258,17 @@ Google aggressively fingerprints automation and often serves a `/sorry`
 "unusual traffic" + reCAPTCHA page — sometimes on the very first request, even from a
 normal residential connection. TIS does **not** try to solve or bypass it. Instead:
 
-- In **headful** mode it detects the CAPTCHA, pauses, and prints a message; you solve it
-  by hand in the browser window and harvesting resumes automatically.
-- In **headless** mode it can't be solved, so the run stops with a message telling you to
-  re-run with `--headful`.
+- Google always runs **headful** (it doesn't work headless), so no flag is needed.
+- When a CAPTCHA shows up it pauses and prints a message; you solve it by hand in the
+  browser window and harvesting resumes automatically.
+- With `--unattended` nobody can solve it, so Google isn't harvested at all (see
+  [Unattended runs](#unattended-runs)).
 
 Pair it with `--profile-dir` so the solved-exemption and consent cookies persist between
 runs — after the first manual solve, later runs often skip the CAPTCHA entirely:
 
 ```bash
-tis "Ferrari Italia" --collect 20 --headful --profile-dir chrome-profile
+tis "Ferrari Italia" --collect 20 --source google --profile-dir chrome-profile
 ```
 
 Use a **dedicated** folder for `--profile-dir`, not your everyday Chrome profile. It
@@ -275,6 +277,28 @@ stores cookies/session data and is git-ignored.
 > **Reality check:** this makes Google *usable* but semi-manual — you're on standby to
 > solve a challenge. For hands-off bulk collection, a server-rendered source like Bing
 > (see Roadmap) is the better long-term default.
+
+---
+
+## Unattended runs
+
+Use `--unattended` when nobody is at the keyboard — batch scripts, scheduled jobs. TIS
+then never waits for a person:
+
+- **Google is not harvested.** It needs a CAPTCHA solved by hand, so its browser search
+  never starts. Leftover URLs already stored (from any source) are still downloaded first.
+- **Any CAPTCHA stops the run** (Yandex, Yahoo, Brave), headless or headful. What was
+  harvested before the stop is still downloaded, and TIS prints
+  `Human intervention required: …` with the reason.
+- **Exit code `3`** when the run stopped because a person was needed, `0` otherwise — so a
+  script can tell "finished" from "stopped at a CAPTCHA".
+
+```bash
+tis "Ferrari Italia" --collect 50 --source yandex --unattended
+```
+
+Without `--unattended`, nothing changes: a headful run still pauses for you to solve the
+CAPTCHA.
 
 ---
 

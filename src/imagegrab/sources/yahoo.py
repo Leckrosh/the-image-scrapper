@@ -13,6 +13,7 @@ NOTES:
   in order to automatically having the limit set per browser because insisting on harvesting won't work at all.
 - It didn't show up in testing, but Yahoo might send to a consent page. In case Yahoo triggers something like that (CAPTCHA,
   consent page, etc), the behaviour is like in chrome, it will wait for human intervention to authorize or do the CAPTCHA.
+  With --unattended it never waits: the run stops and reports that human intervention was required.
 
 Please, if harvesting returns nothing, report it as an issue to update the method.
 """
@@ -28,7 +29,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from ..models import ImageResult
-from .base import USER_AGENT, ImageSource
+from .base import USER_AGENT, HumanInterventionRequired, ImageSource
 
 # Please, if you need more time to accept a consent page, modify it here.
 SOLVE_TIMEOUT_MS = 180_000
@@ -75,6 +76,7 @@ class YahooImagesSource(ImageSource):
         headful: bool = False,
         pace: float = 1.0,
         safe_search: str = "off",
+        unattended: bool = False,
         nav_timeout_ms: int = 30_000,
         solve_timeout_ms: int = SOLVE_TIMEOUT_MS,
         max_stagnant_rounds: int = 2,
@@ -82,6 +84,7 @@ class YahooImagesSource(ImageSource):
         self.headful = headful
         self.pace = pace
         self.safe_search = safe_search
+        self.unattended = unattended
         self.nav_timeout_ms = nav_timeout_ms
         self.solve_timeout_ms = solve_timeout_ms
         self.max_stagnant_rounds = max_stagnant_rounds
@@ -186,6 +189,11 @@ class YahooImagesSource(ImageSource):
         if not self._is_off_results(page):
             return True
         host = urlparse(page.url).hostname
+        if self.unattended:
+            raise HumanInterventionRequired(
+                f"Yahoo sent the browser to {host} instead of the results "
+                "(usually a consent page)"
+            )
         if not self.headful:
             _log(
                 f"Yahoo sent the browser to {host} instead of the results (usually a "

@@ -9,7 +9,8 @@ way to make it without UI.
 - For Google case, due to its antibot rules, a manual reCAPTCHA is required, I'm aware this involves a manual
 step, but didn't figure out how to evade it, anyway, once that manual step is done, the automation continues without a problem.
 So it's just an extra step if you choose Google Images as your Image source.
-- The "--headful" flag won't work at all on Google.
+- Google won't work at all headless, so it always runs headful (no "--headful" flag needed).
+- Because the CAPTCHA needs a person, "--unattended" runs never harvest Google.
 
 Due to limitations and different approaches, in the roadmap is considered to automatically setup the download with the only valid
 approach to download images, it has no sense to keep it, but I'll work on it on future releases.
@@ -26,7 +27,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from ..models import ImageResult
-from .base import USER_AGENT, ImageSource
+from .base import USER_AGENT, HumanInterventionRequired, ImageSource
 
 __all__ = ["GoogleImagesSource", "USER_AGENT"]
 
@@ -88,12 +89,15 @@ def _log(message: str) -> None:
 class GoogleImagesSource(ImageSource):
 
     name = "google"
+    headless = False
+    needs_human = True
 
     def __init__(
         self,
         headful: bool = False,
         pace: float = 1.0,
         profile_dir: str | None = None,
+        unattended: bool = False,
         nav_timeout_ms: int = 30_000,
         solve_timeout_ms: int = SOLVE_TIMEOUT_MS,
         max_stagnant_rounds: int = 4,
@@ -101,6 +105,7 @@ class GoogleImagesSource(ImageSource):
         self.headful = headful
         self.pace = pace
         self.profile_dir = profile_dir
+        self.unattended = unattended
         self.nav_timeout_ms = nav_timeout_ms
         self.solve_timeout_ms = solve_timeout_ms
         self.max_stagnant_rounds = max_stagnant_rounds
@@ -167,6 +172,10 @@ class GoogleImagesSource(ImageSource):
     def _await_human(self, page) -> bool:
         if not self._is_blocked(page):
             return True
+        if self.unattended:
+            raise HumanInterventionRequired(
+                "Google served a CAPTCHA / 'unusual traffic' page"
+            )
         if not self.headful:
             _log(
                 "Google served a CAPTCHA / 'unusual traffic' page and this is a "

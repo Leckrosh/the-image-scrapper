@@ -12,7 +12,8 @@ NOTES:
 - Scrolling loads more results through an XHR that does NOT update that blob, so instead of scrolling, pages are
   requested with `&p=N` (0-based, ~30 new images per page). Anyway, Yandex stops around p=50 (HTTP 404). This allows ~1.5K images per term.
 - If the CAPTCHA shows up it comes back as a normal page (HTTP 200), so it's detected by URL/markup. With --headful the
-  run requires human intervention (same as Google), headless just stops with a message.
+  run requires human intervention (same as Google), headless just stops with a message. With --unattended it never
+  waits: the run stops and reports that human intervention was required.
 - Yandex's family filter is left on its default (Moderate), but it might be turned off depending on what is being searched.
 - Results tends to redirect to Russian sites (e.g. several photos of the same avto.ru listing), dedup takes care of near-duplicates.
 
@@ -30,7 +31,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from ..models import ImageResult
-from .base import USER_AGENT, ImageSource
+from .base import USER_AGENT, HumanInterventionRequired, ImageSource
 
 # Please, if you need more time to solve the CAPTCHA modify it here.
 SOLVE_TIMEOUT_MS = 180_000
@@ -82,12 +83,14 @@ class YandexImagesSource(ImageSource):
         self,
         headful: bool = False,
         pace: float = 1.0,
+        unattended: bool = False,
         nav_timeout_ms: int = 30_000,
         solve_timeout_ms: int = SOLVE_TIMEOUT_MS,
         max_stagnant_rounds: int = 2,
     ) -> None:
         self.headful = headful
         self.pace = pace
+        self.unattended = unattended
         self.nav_timeout_ms = nav_timeout_ms
         self.solve_timeout_ms = solve_timeout_ms
         self.max_stagnant_rounds = max_stagnant_rounds
@@ -176,6 +179,11 @@ class YandexImagesSource(ImageSource):
     def _await_human(self, page) -> bool:
         if not self._is_blocked(page):
             return True
+        if self.unattended:
+            raise HumanInterventionRequired(
+                "Yandex is asking for a CAPTCHA (usually too many requests from "
+                "this IP)"
+            )
         if not self.headful:
             _log(
                 "Yandex is asking for a CAPTCHA (usually too many requests from "
