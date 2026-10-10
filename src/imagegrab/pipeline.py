@@ -4,8 +4,9 @@ from collections import Counter
 from collections.abc import Callable
 
 from .downloader import Downloader
+from .models import RunResult
 from .resolution import TIERS
-from .sources import DEFAULT_SOURCE, build_source
+from .sources import DEFAULT_SOURCE, SOURCES, HumanInterventionRequired, build_source
 from .store import KEPT, Store
 
 # HARVEST_CEILING caps the NEW urls a run takes from a source; SCAN_CEILING caps
@@ -29,8 +30,9 @@ def run(
     concurrency: int = 20,
     pace: float = 1.0,
     profile_dir: str | None = None,
+    unattended: bool = False,
     progress: Callable[[str], None] = print,
-) -> dict[str, int]:
+) -> RunResult:
     tier = TIERS[min_resolution]
     store = Store(db_path)
     downloader = Downloader(store, out_dir, tier, concurrency=concurrency)
@@ -44,7 +46,7 @@ def run(
                 f"[tis] already at --max-total for '{query}' "
                 f"(have {stored}, max {max_total}) - nothing to do."
             )
-            return store.counts(query)
+            return RunResult(store.counts(query))
         if room < collect:
             progress(
                 f"[tis] have {stored}; --collect {collect} trimmed to {room} "
@@ -94,43 +96,76 @@ def run(
             return _summary(store, query, kept, goal, progress)
         progress(f"{line}; harvesting {source} for the other {goal - kept}.")
 
+    # Blocked = its browser search never starts; the leftovers above were still used.
+    if unattended and SOURCES[source].needs_human:
+        reason = (
+            f"{source} needs a CAPTCHA solved by hand, so it isn't harvested "
+            "in --unattended runs."
+        )
+        progress(f"[tis] Human intervention required: {reason}")
+        return _summary(store, query, kept, goal, progress, human_required=reason)
+
     harvester = build_source(
-        source, headful=headful, pace=pace, profile_dir=profile_dir
+        source,
+        headful=headful,
+        pace=pace,
+        profile_dir=profile_dir,
+        unattended=unattended,
     )
+    progress(_mode_line(source, headful))
     harvest: Counter[tuple[str, str]] = Counter()
     seen = 0
     new_urls = 0
     hit_ceiling = False
+    human_required = None
     batch = []
 
-    for result in harvester.search(query, limit=SCAN_CEILING):
-        seen += 1
-        row = store.add_candidate(result)
-        if row is not None:
-            new_urls += 1
-            batch.append(row)
+    try:
+        for result in harvester.search(query, limit=SCAN_CEILING):
+            seen += 1
+            row = store.add_candidate(result)
+            if row is not None:
+                new_urls += 1
+                batch.append(row)
 
-        if len(batch) >= BATCH_SIZE:
-            kept += _download(downloader, batch, goal - kept, harvest)
-            batch.clear()
-            progress(f"[tis] kept {kept}/{goal} (harvested {seen}, {new_urls} new)")
-            if kept >= goal:
+            if len(batch) >= BATCH_SIZE:
+                kept += _download(downloader, batch, goal - kept, harvest)
+                batch.clear()
+                progress(f"[tis] kept {kept}/{goal} (harvested {seen}, {new_urls} new)")
+                if kept >= goal:
+                    break
+
+            if new_urls >= HARVEST_CEILING:
+                hit_ceiling = True
                 break
+    except HumanInterventionRequired as exc:
+        human_required = f"{exc}; --unattended runs don't wait for it."
+        progress(f"[tis] Human intervention required: {human_required}")
 
-        if new_urls >= HARVEST_CEILING:
-            hit_ceiling = True
-            break
-
+    # Whatever was harvested before a stop is still downloaded.
     if batch and kept < goal:
         kept += _download(downloader, batch, goal - kept, harvest)
         progress(f"[tis] kept {kept}/{goal} (harvested {seen}, {new_urls} new)")
 
-    if kept < goal:
+    if kept < goal and human_required is None:
         _diagnose(
             progress, source, query, min_resolution, seen, new_urls, hit_ceiling, harvest
         )
 
-    return _summary(store, query, kept, goal, progress)
+    return _summary(
+        store, query, kept, goal, progress, human_required=human_required
+    )
+
+
+def _mode_line(source: str, headful: bool) -> str:
+    if not SOURCES[source].headless:
+        return (
+            f"[tis] {source}: headful mode strictly enabled "
+            "(this source doesn't work headless)."
+        )
+    if headful:
+        return f"[tis] {source}: headful (--headful)."
+    return f"[tis] {source}: headless (default)."
 
 
 def _download(
@@ -242,8 +277,13 @@ def _diagnose(
 
 
 def _summary(
-    store: Store, query: str, kept: int, goal: int, progress: Callable[[str], None]
-) -> dict[str, int]:
+    store: Store,
+    query: str,
+    kept: int,
+    goal: int,
+    progress: Callable[[str], None],
+    human_required: str | None = None,
+) -> RunResult:
     counts = store.counts(query)
     progress(
         f"[tis] done: +{kept} of {goal} new for '{query}' "
@@ -251,4 +291,4 @@ def _summary(
     )
     breakdown = ", ".join(f"{status}={n}" for status, n in sorted(counts.items()))
     progress(f"[tis] status breakdown: {breakdown or '(none)'}")
-    return counts
+    return RunResult(counts, human_required)

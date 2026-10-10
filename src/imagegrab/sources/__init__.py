@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import ImageSource
+from .base import HumanInterventionRequired, ImageSource
 from .bing import BingImagesSource
 from .brave import BraveImagesSource
 from .duckduckgo import DuckDuckGoImagesSource
@@ -20,7 +20,13 @@ SOURCES: dict[str, type[ImageSource]] = {
 # Bing is selected as default only because is the 1st solution that works headless with no more human intervention
 DEFAULT_SOURCE = "bing"
 
-__all__ = ["SOURCES", "DEFAULT_SOURCE", "ImageSource", "build_source"]
+__all__ = [
+    "SOURCES",
+    "DEFAULT_SOURCE",
+    "HumanInterventionRequired",
+    "ImageSource",
+    "build_source",
+]
 
 
 def build_source(
@@ -29,18 +35,26 @@ def build_source(
     headful: bool = False,
     pace: float = 1.0,
     profile_dir: str | None = None,
+    unattended: bool = False,
 ) -> ImageSource:
 
+    if name not in SOURCES:
+        raise ValueError(f"unknown source: {name!r} (choices: {', '.join(SOURCES)})")
+    # A source that can't run headless always runs headful, whatever was asked.
+    headful = headful or not SOURCES[name].headless
+
     if name == "google":
-        return GoogleImagesSource(headful=headful, pace=pace, profile_dir=profile_dir)
+        return GoogleImagesSource(
+            headful=headful, pace=pace, profile_dir=profile_dir, unattended=unattended
+        )
     if name == "bing":
         return BingImagesSource(headful=headful, pace=pace)
     if name == "yandex":
-        return YandexImagesSource(headful=headful, pace=pace)
+        return YandexImagesSource(headful=headful, pace=pace, unattended=unattended)
     if name == "yahoo":
-        return YahooImagesSource(headful=headful, pace=pace)
+        return YahooImagesSource(headful=headful, pace=pace, unattended=unattended)
     if name == "brave":
-        return BraveImagesSource(headful=headful)
+        return BraveImagesSource(headful=headful, unattended=unattended)
     if name == "duckduckgo":
         return DuckDuckGoImagesSource(headful=headful, pace=pace)
-    raise ValueError(f"unknown source: {name!r} (choices: {', '.join(SOURCES)})")
+    raise ValueError(f"no builder for source {name!r} - add it to build_source()")

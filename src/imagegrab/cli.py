@@ -9,6 +9,8 @@ from .resolution import TIERS
 from .sources import DEFAULT_SOURCE, SOURCES
 
 COLLECT_CEILING = 1000
+# 1 and 2 are left to Python errors and argparse usage errors.
+EXIT_HUMAN_REQUIRED = 3
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -55,9 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
             "solve it. 'yahoo' is headless too (a few hundred images per term at "
             "most). 'brave' is headless too and has its own index, so its images "
             "barely overlap with the others (at most ~200 per term). 'duckduckgo' "
-            "only works with --headful (it refuses headless browsers); no manual "
-            "step after that, a few hundred images per term. 'google' is "
-            "richer but fragile and may need --headful to solve a CAPTCHA by hand."
+            "always runs headful (it refuses headless browsers); no manual step, "
+            "a few hundred images per term. 'google' is richer but fragile; it "
+            "always runs headful so you can solve its CAPTCHA by hand."
         ),
     )
     parser.add_argument(
@@ -86,12 +88,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--headful",
         action="store_true",
         help=(
-            "Show the browser while harvesting. Required for Google to solve a "
-            "CAPTCHA by hand; on Yandex it pauses for you to solve one only if it "
+            "Show the browser for the sources that run headless by default: on "
+            "Yandex and Brave it pauses for you to solve a CAPTCHA only if one "
             "shows up; on Yahoo it pauses only if you're sent to a consent page; "
-            "on Brave it pauses only if a CAPTCHA shows up; required for "
-            "DuckDuckGo, which refuses headless browsers; "
-            "for Bing it's optional (just to watch/debug)."
+            "for Bing it's just to watch/debug. Not needed for Google and "
+            "DuckDuckGo: they always run headful."
+        ),
+    )
+    parser.add_argument(
+        "--unattended",
+        action="store_true",
+        help=(
+            "Nobody is at the keyboard (e.g. batch scripts): never wait for a "
+            "person. If a source asks for a CAPTCHA the run stops, keeps what it "
+            f"already downloaded and exits with code {EXIT_HUMAN_REQUIRED}. Google "
+            "is not harvested at all (it needs a CAPTCHA solved by hand); "
+            "leftovers already stored are still used."
         ),
     )
     parser.add_argument(
@@ -99,8 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Google only: persistent browser profile directory. Remembers consent "
-            "+ CAPTCHA solves across runs - recommended with --headful. Use a "
-            "dedicated folder, not your everyday Chrome profile. Ignored by "
+            "+ CAPTCHA solves across runs. Use a dedicated folder, not your "
+            "everyday Chrome profile. Ignored by "
             "--source bing, yandex, yahoo, brave and duckduckgo."
         ),
     )
@@ -144,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_total is not None and args.max_total < 1:
         parser.error("--max-total must be at least 1")
 
-    run(
+    result = run(
         query=args.query,
         collect=collect,
         max_total=args.max_total,
@@ -157,8 +169,9 @@ def main(argv: list[str] | None = None) -> int:
         concurrency=args.concurrency,
         pace=args.pace,
         profile_dir=args.profile_dir,
+        unattended=args.unattended,
     )
-    return 0
+    return EXIT_HUMAN_REQUIRED if result.human_required else 0
 
 
 if __name__ == "__main__":

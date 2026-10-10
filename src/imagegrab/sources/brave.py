@@ -12,7 +12,8 @@ NOTES:
   low resolution images.
 - SafeSearch is turned off with `&safesearch=off` in the URL (same effect as Brave's `safesearch` cookie).
 - Even if the CAPTCHA didn't triggers, I left the same mechanism created for Google, waiting for human intervention
-  if some manual verification is needed.
+  if some manual verification is needed. With --unattended it never waits: the run stops and reports that human
+  intervention was required.
 
 Please, if harvesting returns nothing, report it as an issue to update the method.
 """
@@ -30,7 +31,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
 from ..models import ImageResult
-from .base import USER_AGENT, ImageSource
+from .base import USER_AGENT, HumanInterventionRequired, ImageSource
 
 # Please, if you need more time to solve the CAPTCHA modify it here.
 SOLVE_TIMEOUT_MS = 180_000
@@ -105,11 +106,13 @@ class BraveImagesSource(ImageSource):
         self,
         headful: bool = False,
         safe_search: str = "off",
+        unattended: bool = False,
         nav_timeout_ms: int = 30_000,
         solve_timeout_ms: int = SOLVE_TIMEOUT_MS,
     ) -> None:
         self.headful = headful
         self.safe_search = safe_search
+        self.unattended = unattended
         self.nav_timeout_ms = nav_timeout_ms
         self.solve_timeout_ms = solve_timeout_ms
 
@@ -219,6 +222,8 @@ class BraveImagesSource(ImageSource):
             return False
 
     def _await_human(self, page) -> bool:
+        if self.unattended:
+            raise HumanInterventionRequired("Brave is asking for a CAPTCHA (HTTP 429)")
         if not self.headful:
             _log(
                 "Brave is asking for a CAPTCHA (HTTP 429) and this is a headless "

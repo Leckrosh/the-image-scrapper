@@ -1,5 +1,5 @@
 """
-DuckDuckGo Images source: Works ONLY with a headful browser (--headful). September 27, 2026.
+DuckDuckGo Images source: Works ONLY with a headful browser, so it always runs headful (no flag needed). September 27, 2026.
 
 DuckDuckGo refuses headless browsers: the very first request is redirected to its error page
 (`static-pages/home-error/418.html`, "Unexpected error"). Headful didn't ask for a CAPTCHA.
@@ -53,6 +53,7 @@ def _is_results(url: str) -> bool:
 class DuckDuckGoImagesSource(ImageSource):
 
     name = "duckduckgo"
+    headless = False
 
     def __init__(
         self,
