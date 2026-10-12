@@ -8,7 +8,9 @@ from .pipeline import run
 from .resolution import TIERS
 from .sources import DEFAULT_SOURCE, SOURCES
 
-COUNT_CEILING = 1000
+COLLECT_CEILING = 1000
+# 1 and 2 are left to Python errors and argparse usage errors.
+EXIT_HUMAN_REQUIRED = 3
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -20,12 +22,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("query", help="Search term, e.g. \"Ferrari Italia\".")
     parser.add_argument(
-        "--count",
+        "--collect",
         type=int,
         default=50,
         help=(
-            "Number of images to KEEP after dedup + resolution filtering "
-            f"(default: 50; clamped to 1..{COUNT_CEILING})."
+            "Number of NEW images to keep this run (after dedup + resolution "
+            "filtering), on top of what is already stored for the term "
+            f"(default: 50; clamped to 1..{COLLECT_CEILING})."
+        ),
+    )
+    parser.add_argument(
+        "--max-total",
+        type=int,
+        default=None,
+        help=(
+            "Never let the term's folder go past this many images in total, "
+            "whatever --collect says. Applies to this run only (not saved)."
         ),
     )
     parser.add_argument(
@@ -45,9 +57,18 @@ def build_parser() -> argparse.ArgumentParser:
             "solve it. 'yahoo' is headless too (a few hundred images per term at "
             "most). 'brave' is headless too and has its own index, so its images "
             "barely overlap with the others (at most ~200 per term). 'duckduckgo' "
-            "only works with --headful (it refuses headless browsers); no manual "
-            "step after that, a few hundred images per term. 'google' is "
-            "richer but fragile and may need --headful to solve a CAPTCHA by hand."
+            "always runs headful (it refuses headless browsers); no manual step, "
+            "a few hundred images per term. 'google' is richer but fragile; it "
+            "always runs headful so you can solve its CAPTCHA by hand."
+        ),
+    )
+    parser.add_argument(
+        "--unique-source",
+        action="store_true",
+        help=(
+            "Use only the chosen --source. By default, leftover URLs found earlier "
+            "by ANY source are downloaded first; with this flag, leftovers from "
+            "other sources are skipped (this source's own are still used)."
         ),
     )
     parser.add_argument(
@@ -67,12 +88,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--headful",
         action="store_true",
         help=(
-            "Show the browser while harvesting. Required for Google to solve a "
-            "CAPTCHA by hand; on Yandex it pauses for you to solve one only if it "
+            "Show the browser for the sources that run headless by default: on "
+            "Yandex and Brave it pauses for you to solve a CAPTCHA only if one "
             "shows up; on Yahoo it pauses only if you're sent to a consent page; "
-            "on Brave it pauses only if a CAPTCHA shows up; required for "
-            "DuckDuckGo, which refuses headless browsers; "
-            "for Bing it's optional (just to watch/debug)."
+            "for Bing it's just to watch/debug. Not needed for Google and "
+            "DuckDuckGo: they always run headful."
+        ),
+    )
+    parser.add_argument(
+        "--unattended",
+        action="store_true",
+        help=(
+            "Nobody is at the keyboard (e.g. batch scripts): never wait for a "
+            "person. If a source asks for a CAPTCHA the run stops, keeps what it "
+            f"already downloaded and exits with code {EXIT_HUMAN_REQUIRED}. Google "
+            "is not harvested at all (it needs a CAPTCHA solved by hand); "
+            "leftovers already stored are still used."
         ),
     )
     parser.add_argument(
@@ -80,8 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Google only: persistent browser profile directory. Remembers consent "
-            "+ CAPTCHA solves across runs - recommended with --headful. Use a "
-            "dedicated folder, not your everyday Chrome profile. Ignored by "
+            "+ CAPTCHA solves across runs. Use a dedicated folder, not your "
+            "everyday Chrome profile. Ignored by "
             "--source bing, yandex, yahoo, brave and duckduckgo."
         ),
     )
@@ -107,23 +138,29 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
-    count = args.count
-    if count < 1:
-        print("[imagegrab] --count below 1; clamping to 1.", file=sys.stderr)
-        count = 1
-    elif count > COUNT_CEILING:
+    collect = args.collect
+    if collect < 1:
+        print("[tis] --collect below 1; clamping to 1.", file=sys.stderr)
+        collect = 1
+    elif collect > COLLECT_CEILING:
         print(
-            f"[imagegrab] --count {count} exceeds the {COUNT_CEILING} ceiling; "
-            f"clamping to {COUNT_CEILING}.",
+            f"[tis] --collect {collect} exceeds the {COLLECT_CEILING} ceiling; "
+            f"clamping to {COLLECT_CEILING}.",
             file=sys.stderr,
         )
-        count = COUNT_CEILING
+        collect = COLLECT_CEILING
 
-    run(
+    if args.max_total is not None and args.max_total < 1:
+        parser.error("--max-total must be at least 1")
+
+    result = run(
         query=args.query,
-        count=count,
+        collect=collect,
+        max_total=args.max_total,
+        unique_source=args.unique_source,
         min_resolution=args.min_resolution,
         out_dir=args.out,
         db_path=args.db,
@@ -132,8 +169,9 @@ def main(argv: list[str] | None = None) -> int:
         concurrency=args.concurrency,
         pace=args.pace,
         profile_dir=args.profile_dir,
+        unattended=args.unattended,
     )
-    return 0
+    return EXIT_HUMAN_REQUIRED if result.human_required else 0
 
 
 if __name__ == "__main__":

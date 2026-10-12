@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <sub>v.0.0.3 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
+  <sub>v.0.0.4 · Python 3.12+ · Bing + Google Images · resumable · resolution-filtered</sub>
 </p>
 
 ---
@@ -29,15 +29,15 @@ playwright install chromium
 
 3. Start downloading Images
 ```bash
-tis "Ferrari Italia" --count 20 --min-resolution 1080p
+tis "Ferrari Italia" --collect 20 --min-resolution 1080p
 ```
 
 That uses the default **Bing** source — no browser window, no CAPTCHA. To use
-Google instead, add `--source google` (and `--headful` so you can solve a CAPTCHA
-by hand):
+Google instead, add `--source google`. It always opens a browser window, so you can
+solve a CAPTCHA by hand (no `--headful` needed):
 
 ```bash
-tis "Ferrari Italia" --count 20 --min-resolution 1080p --source google --headful
+tis "Ferrari Italia" --collect 20 --min-resolution 1080p --source google
 ```
 
 Kept images land in `images/ferrari_italia/ferrari_italia_0001.jpg`, `…_0002.jpg`, … — one folder per search term.
@@ -57,7 +57,8 @@ duplicate files, and no clean per-topic organization.
 - **Full-resolution images from Bing (default) or Google Images** (working as of September 2026).
 - **Collect by search term**, with filtering (e.g. minimum resolution) and automatic de-duplication.
 - **Tidy output**: one folder per term, sequentially numbered files.
-- **Resumable**: stop and re-run; it tops up toward your target instead of starting over.
+- **Incremental**: each run adds `--collect` new images to what you already have, using
+  leftovers from earlier runs first instead of starting over.
 
 ---
 
@@ -82,11 +83,11 @@ one with `--source` (default: `bing`).
 | Source        | Status                 | Notes                                                        |
 | ------------- | ---------------------- | ------------------------------------------------------------ |
 | Bing Images   | ✅ Supported (default) | Headless browser — hands-off: no CAPTCHA, no manual step.    |
-| Google Images | ✅ Supported           | Real browser; may hit a CAPTCHA you solve by hand (`--headful`). |
+| Google Images | ✅ Supported           | Always headful; may hit a CAPTCHA you solve by hand. Not harvested with `--unattended`. |
 | Brave Images | ✅ Supported           | Headless browser, no CAPTCHA & no manual step. |
 | Yahoo Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
 | Yandex Images | ✅ Supported           | Headless browser. No CAPTCHA & no manual step. |
-| DuckDuckGo Images | ✅ Supported           | Real browser but no CAPTCHA need to be solved. (`--headful`). |
+| DuckDuckGo Images | ✅ Supported           | Always headful (it refuses headless browsers), but no CAPTCHA to solve. |
 
 > All sources drive a browser, but they're not equal.
 > </br> e.g. 
@@ -126,29 +127,55 @@ playwright install chromium
 ## Usage
 
 ```bash
-tis "Ferrari Italia" --count 20 --min-resolution 1080p
+tis "Ferrari Italia" --collect 20 --min-resolution 1080p
 ```
 
 | Option             | Default        | Meaning                                                          |
 | ------------------ | -------------- | ---------------------------------------------------------------- |
 | `query`            | —              | Positional search term.                                          |
-| `--count`          | `50`           | Images to **keep** after filtering (clamped `1..1000`).          |
+| `--collect`        | `50`           | **New** images to keep this run, on top of what's already stored (clamped `1..1000`). |
+| `--max-total`      | none           | Cap on the term's total stored images; trims `--collect` if needed. This run only. |
 | `--min-resolution` | `none`         | `none` / `480p` / `720p` / `1080p` / `4k`.                       |
 | `--source`         | `bing`         | Harvest source: `bing` (hands-off) or `google` (fragile).        |
+| `--unique-source`  | off            | Use only `--source`: skip leftover URLs found by other sources.  |
 | `--out`            | `images`       | Root output folder for kept images.                              |
 | `--db`             | `imagegrab.db` | SQLite manifest path.                                            |
-| `--headful`        | off            | Show the browser. On Google, required to solve a CAPTCHA by hand; on Bing, just to watch/debug. |
+| `--headful`        | per source     | Show the browser for sources that run headless by default (Bing, Yandex, Yahoo, Brave) — to watch/debug or solve a CAPTCHA by hand. Google and DuckDuckGo always run headful. |
+| `--unattended`     | off            | Nobody at the keyboard: never wait for a person. A CAPTCHA stops the run (exit code `3`); Google isn't harvested. See [Unattended runs](#unattended-runs). |
 | `--profile-dir`    | none           | **Google only:** persistent profile — remembers consent + CAPTCHA solves. |
 | `--concurrency`    | `20`           | Max simultaneous downloads.                                      |
 | `--pace`           | `1.0`          | Seconds between scrolls while harvesting (thumbnail hovers on Google). |
 
-**About `--count`:** it is the number of images **kept** after de-duplication and the
-resolution filter — TIS over-harvests to absorb losses. It's a *ceiling*, not a
-guarantee: each source usually yields only a few hundred images per term.
+**About `--collect`:** it is the number of **new** images kept *this run*, after
+de-duplication and the resolution filter, on top of whatever the term already has — with
+50 stored, `--collect 30` leaves you with 80. TIS over-harvests to absorb losses, but
+it's a *ceiling*, not a guarantee: each source usually yields only a few hundred images
+per term. When a run comes up short, TIS tells you why — e.g. the source is exhausted
+for the term, it's running dry at your `--min-resolution`, or it was blocked.
+
+**About `--max-total`:** a cap on the term's total, whatever `--collect` says. With 900
+stored, `--collect 300 --max-total 1000` collects only 100; with 1000 already stored it
+exits before opening a browser. It applies only to the run you pass it to — it is
+**not saved**.
+
+```bash
+tis "Ferrari Italia" --collect 300 --max-total 1000
+```
+
+**About leftovers and `--unique-source`:** URLs harvested earlier but never downloaded
+are used first on the next run, whichever source found them — they need no browser, and
+if they cover `--collect` the harvest is skipped entirely. Add `--unique-source` to use
+only the chosen `--source`: other sources' leftovers are skipped, its own are still used.
+
+```bash
+tis "Ferrari Italia" --source yandex --unique-source --collect 50
+```
 
 **About `--min-resolution`:** the default `none` maps to tier `0`, i.e. **no resolution
 filtering** — every decodable image passes. Higher tiers require
-`min(width, height) >= tier`, measured on the decoded bytes.
+`min(width, height) >= tier`, measured on the decoded bytes. Lowering it later reuses
+images an earlier, stricter run rejected as too small: their measured size is in the
+manifest, so TIS re-downloads just the ones that now pass — before any new harvest.
 
 ### Output layout
 
@@ -195,7 +222,9 @@ harvest (Playwright -> Google)     SQLite manifest       download (async httpx)
 when `min(width, height) >= tier`.
 
 **Everything is resumable:** the SQLite manifest records every URL and its outcome, so
-re-running a query skips what's already done and tops up toward `--count`.
+re-running a query never downloads the same image twice. Leftover URLs and earlier
+too-small rejects that now pass are used first; only then does a new harvest add more
+toward `--collect`.
 
 ---
 
@@ -218,7 +247,7 @@ URL/selectors are isolated in one clearly-marked block in
 `--headful` to watch).
 
 ```bash
-tis "Ferrari Italia" --count 50            # Bing is the default
+tis "Ferrari Italia" --collect 50          # Bing is the default
 ```
 
 ---
@@ -229,16 +258,17 @@ Google aggressively fingerprints automation and often serves a `/sorry`
 "unusual traffic" + reCAPTCHA page — sometimes on the very first request, even from a
 normal residential connection. TIS does **not** try to solve or bypass it. Instead:
 
-- In **headful** mode it detects the CAPTCHA, pauses, and prints a message; you solve it
-  by hand in the browser window and harvesting resumes automatically.
-- In **headless** mode it can't be solved, so the run stops with a message telling you to
-  re-run with `--headful`.
+- Google always runs **headful** (it doesn't work headless), so no flag is needed.
+- When a CAPTCHA shows up it pauses and prints a message; you solve it by hand in the
+  browser window and harvesting resumes automatically.
+- With `--unattended` nobody can solve it, so Google isn't harvested at all (see
+  [Unattended runs](#unattended-runs)).
 
 Pair it with `--profile-dir` so the solved-exemption and consent cookies persist between
 runs — after the first manual solve, later runs often skip the CAPTCHA entirely:
 
 ```bash
-tis "Ferrari Italia" --count 20 --headful --profile-dir chrome-profile
+tis "Ferrari Italia" --collect 20 --source google --profile-dir chrome-profile
 ```
 
 Use a **dedicated** folder for `--profile-dir`, not your everyday Chrome profile. It
@@ -247,6 +277,28 @@ stores cookies/session data and is git-ignored.
 > **Reality check:** this makes Google *usable* but semi-manual — you're on standby to
 > solve a challenge. For hands-off bulk collection, a server-rendered source like Bing
 > (see Roadmap) is the better long-term default.
+
+---
+
+## Unattended runs
+
+Use `--unattended` when nobody is at the keyboard — batch scripts, scheduled jobs. TIS
+then never waits for a person:
+
+- **Google is not harvested.** It needs a CAPTCHA solved by hand, so its browser search
+  never starts. Leftover URLs already stored (from any source) are still downloaded first.
+- **Any CAPTCHA stops the run** (Yandex, Yahoo, Brave), headless or headful. What was
+  harvested before the stop is still downloaded, and TIS prints
+  `Human intervention required: …` with the reason.
+- **Exit code `3`** when the run stopped because a person was needed, `0` otherwise — so a
+  script can tell "finished" from "stopped at a CAPTCHA".
+
+```bash
+tis "Ferrari Italia" --collect 50 --source yandex --unattended
+```
+
+Without `--unattended`, nothing changes: a headful run still pauses for you to solve the
+CAPTCHA.
 
 ---
 

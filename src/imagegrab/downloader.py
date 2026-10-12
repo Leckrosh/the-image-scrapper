@@ -21,6 +21,7 @@ import asyncio
 import io
 import ssl
 import threading
+from collections import Counter
 from pathlib import Path
 
 import httpx
@@ -32,7 +33,7 @@ from .dedup import sha256_bytes
 from .naming import image_filename, slugify
 from .resolution import passes
 from .sources.base import USER_AGENT
-from .store import Store
+from .store import KEPT, Store
 
 _EXT_BY_FORMAT = {
     "jpeg": "jpg",
@@ -62,17 +63,35 @@ class Downloader:
         self.timeout = timeout
         self._next_index: dict[str, int] = {}
 
-    def run(self, rows, max_keep: int | None = None) -> int:
+    # Returns how each processed row ended, as {(source, status): n}.
+    def run(self, rows, max_keep: int | None = None) -> Counter[tuple[str, str]]:
+        outcomes: Counter[tuple[str, str]] = Counter()
         rows = list(rows)
         if not rows or (max_keep is not None and max_keep <= 0):
-            return 0
+            return outcomes
         fetched = self._fetch_all_sync(rows)
         kept = 0
-        for row_id, query, data, error in fetched:
+        for row, (row_id, query, data, error) in zip(rows, fetched):
             if max_keep is not None and kept >= max_keep:
                 break
-            kept += self._process(row_id, query, data, error)
-        return kept
+            status = self._process(row_id, query, data, error)
+            outcomes[(row.source, status)] += 1
+            if status == KEPT:
+                kept += 1
+        return outcomes
+
+    # Reused rows still carry the hashes from their first download, so the ones
+    # that now match a kept image are settled without fetching them again.
+    def drop_known_duplicates(self, rows) -> list:
+        fresh = []
+        for row in rows:
+            if row.byte_hash and self.store.byte_hash_exists(row.byte_hash):
+                self.store.mark(row, "duplicate")
+            elif row.phash and self.store.near_duplicate(row.phash):
+                self.store.mark(row, "near_duplicate")
+            else:
+                fresh.append(row)
+        return fresh
 
     def _fetch_all_sync(self, rows):
         box: dict = {}
@@ -128,15 +147,15 @@ class Downloader:
 
     def _process(
         self, row_id: int, query: str, data: bytes | None, error: str | None
-    ) -> int:
+    ) -> str:
         if error or not data:
             self.store.mark(row_id, "failed")
-            return 0
+            return "failed"
 
         byte_hash = sha256_bytes(data)
         if self.store.byte_hash_exists(byte_hash):
             self.store.mark(row_id, "duplicate", byte_hash=byte_hash)
-            return 0
+            return "duplicate"
 
         try:
             with Image.open(io.BytesIO(data)) as img:
@@ -146,7 +165,7 @@ class Downloader:
                 phash = str(imagehash.phash(img))
         except (UnidentifiedImageError, OSError, ValueError):
             self.store.mark(row_id, "failed", byte_hash=byte_hash)
-            return 0
+            return "failed"
 
         if self.store.near_duplicate(phash):
             self.store.mark(
@@ -157,7 +176,7 @@ class Downloader:
                 width=width,
                 height=height,
             )
-            return 0
+            return "near_duplicate"
 
         if not passes(width, height, self.tier):
             self.store.mark(
@@ -168,7 +187,7 @@ class Downloader:
                 width=width,
                 height=height,
             )
-            return 0
+            return "too_small"
 
         ext = _EXT_BY_FORMAT.get(fmt, "jpg")
         slug, index = self._next_seq(query)
@@ -178,7 +197,7 @@ class Downloader:
         path.write_bytes(data)
         self.store.mark(
             row_id,
-            "downloaded",
+            KEPT,
             byte_hash=byte_hash,
             phash=phash,
             width=width,
@@ -186,4 +205,4 @@ class Downloader:
             bytes=len(data),
             local_path=str(path),
         )
-        return 1
+        return KEPT
